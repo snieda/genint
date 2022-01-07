@@ -1,0 +1,119 @@
+##############################################################################
+# Defines default properties of different types of neural networks
+# 
+# known: 
+#   NNs         : ANN, CNN, RNN, GAN, AED, RIF
+#   Layers      : InputLayer, Dense, DropOut, SimpleRNN, LSTM, Conv2D, MaxPooling2D, Flatten
+#   activation  : linear, relu, sigmoid, softmax
+#   optimizer   : adam
+#   metrics     : mae, accuracy
+#   loss        : mse, binary_crossentropy
+##############################################################################
+
+# name: test                     # model file name to load (without extension (must be '.h5'))
+#type: csv                       # type of train/test data (csv, binary, sequence)
+network-type: None               # None: automtic evaluation. (ANN, CNN, RNN, GAN, AED, RIF)
+hyper: config                    # hyper-parameter evaluation. config: this, reinforce: reinforcement network, evolution: evolution alg
+parse-dates: True                # whether read_csv should parse dates
+read-index-col: False            # whether read_csv should use y-column as index-col
+read-delimiter: ','              # delimiter to be used by read_csv
+sample-rows: 1000                # maximum set of rows to be learned by model (to increase speed for testing purpose)
+drop-incomplete-rows: True       # drop rows with cells having NaN
+drop-not-number-columns: True    # drop rows with no-number values (like strings)
+drop-columns: []                 # data column names to drop
+y-column: 0                      # column name or index or name + lambda expression  to be used as label column
+transform: {}                    # dict of map- or lambda-transformers
+test-size: 0.20                  # split 20% of loaded data as test data
+random-state: 101                # use this random generation to re-produce a state
+verbose: 1                       # logging output
+
+train-dir: ''                    # to define classifications through folder names (e.g. used by CNN image loading)
+test-dir: ''                     # to define classifications through folder names (e.g. used by CNN image loading)
+
+max-units: 100                   # maximum count of neurons per layer
+batch-size: 16                   # batch_size on learn process (fit)
+epochs: 20                       # epochs to redo the network learning (fit)
+dropout: 0.1                     # on Dropout layers use this dropout value
+max-categories: 20               # maximum count of y values to cagegorize - otherwise use regression
+loss: {regression: mse, binary: binary_crossentropy, categorical: categorical_crossentropy}
+
+########################################
+# example for regression ANN
+########################################
+# data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/04-ANNs/
+
+########################################
+# example for binary ANN
+########################################
+# data-dir: 05-CNNs/
+# data-file: lending_club_loan_two.csv
+# drop-columns: ['emp_title']
+# y-column: 'loan_status'
+# transform: {'loan_status': {'Fully Paid':1,'Charged Off':0}, 'term': 'lambda term: int(term[:3])'}
+
+########################################
+# example for CNN with images
+########################################
+# data-dir: 05-CNNs/DATA
+# train-dir: train
+# test-dir: test
+
+########################################
+# example for RNN sequence
+########################################
+# data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/DATA/
+# data-file: RSCCASN.csv
+# drop-not-number-columns: False
+# parse-dates: [0]
+
+########################################
+# example for AED en-/decoding
+########################################
+data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/DATA/
+data-file: UK_foods.csv
+network-type: AED
+
+RIF: # Reinforced (=DQN)
+    loss: mse
+    activation: relu
+    optimizer: adam
+    metrics: [mae]
+    discount: 0.95                # discount rate
+    eps: 0.5                      # action selection policy
+    eps_decay: 0.999              # timed decay
+    episodes: 20                  # replaying count
+    observations: 20              # network observation count
+    actions: 20                   # network hyper parameters
+
+ANN: # Artificial Neural Network
+    loss: binary_crossentropy
+    activation: relu
+    optimizer: adam
+    metrics: [accuracy]
+CNN: # Convolutional Neural Network
+    loss: binary_crossentropy
+    activation: relu
+    optimizer: adam
+    metrics: [accuracy]
+    color_mode: rgb
+    batch-size: 16
+RNN: # Recurrent Neural Network
+    loss: mse
+    activation: relu
+    optimizer: adam
+    metrics: [accuracy]
+    batch-size: 1
+GAN: # Generative Adversarial Networks (TODO)
+AED: # AutoEncoder
+    loss: mse
+    activation: relu
+    optimizer: sgd
+    metrics: [accuracy]
+    min-units: 2 # dense layers with len(data) // 2 will be created in a loop
+
+hyper-pars: # used for model optimizing, if hyper=True
+    units: [0, 100, 2]
+    loss: [mse, binary_crossentropy]
+    activation: [linear, relu, softmax, sigmoid]
+    optimizer: [adam]
+    metrics: [mae, accuracy]

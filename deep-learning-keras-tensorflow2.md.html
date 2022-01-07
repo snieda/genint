@@ -1,0 +1,160 @@
+# Deep Learning with Keras and Tensorflow2 (21.12.2021)
+
+## Zeiten
+
+22.12.21: 09:30-17:30 (0,5h) 7,5h numpy, pandas, mathplotlib, seaborn, machine Learning (2h: udemy-server-probleme)
+23.12.21: 10:00-19:00 (1,0h) 8,0h ANN, CNN
+24.12.21: 09:00-16:00 (2,5h) 4,5h Tensorboard, RNN
+25.12.21:                    5,0h NLP
+26.12.21:                    3h GAN
+
+## ANN
+
+* Perceptron: y = wx +b # w: weight per neuron, x: input per neuron, b: bias e.g.: -10 to produce a threashold, y: output
+* sigmoid: 1 / (1 + e(-x)) calculate a propability of a classification instead of directly classificate 0 or 1
+* softmax: e(y) / sum(e(y)) : propabilities for all events for all classifications. all nodes together will have value 1.
+* ReLu: max(0, z): rectified linear unit (gleichgerichtete linearfunktion)
+* ReLu with tanh used as standard activation function
+* multiple classification: per classification one output node
+    * not exclusive: output can have multiple positive classifications -> sigmoid function useful
+    * exclusive: output can have only one positive classification -> softmax fuctino useful
+* loss function (Kostenfunktion): deviation from labeled output
+    * only on training
+    * only a mean function, shrinking on trainging time
+    * cubic loss function: c = 1 / 2n * sum(abs(y -a)2)
+    * learning rate: change of weight factors per iteration to minimize the costfunction (deviation to the labeled output)
+        * controls the steps to evaluate the minimum of the costfunction. starting with big steps it should continue with smaller steps
+            * -> gradient descent
+    * adam: 2015 Klingma und Ba: a method for stochastic optimization
+    * cross entropy loss function: -sum(y*log(p)): predicts a propability for each classification
+* backpropagation: use of loss function to go back in the layer chain to change the neurons weights to minimize the output error in the last layer L.
+    * hadamard product: product of each vectors element
+    * delta-weight(l) = w(l+1) * delta-weight(l+1) + sigma(l) : l = layer, sigma: result of activatino function
+    * gradient of loss function per weights: a(l-1) * delta(l)
+    * earlystopping: stops, if loss function of train_data crosses test_data, converging to a minimum
+* Tensorflow-2: neural network with multiple language support, using Keras as API
+    * Keras deep learning framework written in python - API to include Tensorflow, Microsoft Cognitive Toolkit, Theano, Deeplearning4j)
+* loss functin + optimizer:
+    * multiclass classification problem: optimizer='rmsprop', loss='categorical_crossentropy', metrics='accurracy'
+    * binary classification problem: optimizer='rmsprop', loss='binary_crossentropy'
+    * regression problem with mean square error: optimizer='rmsprop', loss='mse'
+* comparing labeled values with model evaluation values (predictions): mean absolute error of 1% is good!
+* practice: keras regression
+    * feature engineering: analyze data:
+        * load dataframe
+        * df.head()
+        * df.describe()
+        * df.isnull().sum()
+        * plt.figure(figsize=(12, 8))
+        * sns.distplot(df['price'])
+        * sns.countplot(df['bedrooms'])
+        * df.corr('price').sort_values()
+        * sns.scatterplot(x='price', y='sqft_living', data=df)
+        * sns.scatterplot(x='long', y='lat', data=df, hue='price')
+        * df['date']=pd.to_datetime(df['date'])
+        * df['month']=df['date'].apply(lambda date:date.month)
+        * df.groupby('month').mean()['price'].plot()
+        * df.drop -> zipcode, date  -> unusable informations
+        * df['yr_renovated'].value_counts()
+    * normalize and transform:
+        * from sklearn.model_selection import train_test_fit
+        * X_train, y_train, X_test, y_test = train_test_fit(X, ytest_size=0.3)
+        * scaler = MinMaxScaler()
+        * X_train = scaler.fit_transform(X_train)
+        * X_test = scaler.transform(X_test)
+    * learn neural net
+        * model = Sequential(Dense(19, activation='relu'), Dense(19), Dense(19), Dense(19))
+        * model.add(Dense(1))
+        * model.compile(optimizer='adam', loss='mse')
+        * model.fit(X_train, y_train.values(), validation_data=(X_test, y_test.values()), epochs=400)
+    * analyse model performance
+        * losses = pd.DataFrame(model.history.history)
+        * losses.plot()
+        * predictions = model.predict(X_test)
+        * mean_absolute_error(y_test, predictions)
+        * mean_square_error(y_test, predictions)
+        * explained_variance_score(y_test, predications) # good performance indicator!
+        * plt.scatter(y_test, predications)
+        * plt.plot(y_test, y_test, 'r') # draw a red line, indicating the ideal graph
+        * errors = y_test.values().reshape(<<linecount>>, 1) - predications
+        * sns.distplot(errors)
+    * predict a new entry
+        * scaler.transform(<<new_entry>>)
+        * new_prediction = model.predict(<<new_entry>>)
+* practice: keras classification
+    * data analysis
+        * sns.heatmap(df.corr())
+        * df.corr('benign_0_mal_1').sort_values().plot(kind='bar')
+* CNN (convolutional neural network)
+    * good for picture data -> computer vision
+    * convolution (Faltung) + Pooling (data reduction)
+    * image filtering = image kernel
+    * filter matrix (3x3) goes through image and does a matrix multiplication resulting in the sum of the matrix-cells
+    * pooling layer: downsampling
+        * max-pooing: only max value of x*y pixels
+        * average-pooling: average of x*y pixels
+        * with a pooling kernel of 2x2 with stride 2 will reduce parameter 75% without downscaling the performance
+    * dropout function to reduce count of neurons to minimize overfitting
+    * one-hot code: bit-array with one 1, coding the classification
+    * image pre-processing
+        * create additional pictures with ImageDataGenerator(<<rotation>>, <<shift>>, <<shear>>, <<rescale>>, <<zoom>>, <<horizontal_flip>>, fill_mode='nearest')
+    * analyse performance:
+        * from sklearn.metrics import classification_report, confusion_matrix
+        * predictions = model.predict_classes(X_test)
+        * np.argmax(predictions, axis=-1)
+        * print(classification_report(X_test, predictions))
+        * sns.heatmap(confusion_matrix(X_test, predications))
+        * plt.imshow(X_test[0])
+* Tensorboard
+    * Tensorboard(log_dir='./', histogram_freq=1, write_graph=True, write_images=True, update_freq='epoch', profile_batch=2, embeddings_freq=1)
+    * on calling model.fit give a tensorboard instance as callback
+* RNN Recurrent Neural network
+    * good for sequential data (e.g.: time-based data stores, heart data, text-sequences)
+    * -> memory cells (output of last activation will be an additional input of next epoch in the RNN)
+    * memorizes only 'younger' outputs
+    * Vanishing or Exploding Gradients
+    * LSTM (Long-Short Term  Memory)
+        * the recurrent input/output will be splitted into long and short time values
+    * pd.read_csv(file, index_col='DATE', parse_dates=True)
+    * generator = TimeseriesGenerator(scaled_train, scaled_train, length=2, batch_size=1)
+    * model: used SimpleRNN or LSTM layer
+    * model.fit_generator(generator, epochs=5)
+    * do a loop over test-data, removing first, appending predicted new entry
+    * scaler.inverse_transformation(test_predications)
+    * on multivariate data (not only one feature (column) and an date index, but multiple features (like wheather sensors)) -> SARIMAX, VARMAX
+* NLP Natural Language Processing
+    * embedded layer (maps character codes into n-dim vectors to concat characters to words)
+    * GRU: Gated Recurrent Unit (like a LSTM with a forget gate but without an output-gate)
+    * last layer: Dense layer with one neuron per character (one-hot princip)
+    * char_dataset = tf.data.Dataset.from_tensor_slices(encoded_text)
+    * sequences = char_dataset.batch(seq_len + 1, drop_remainer=True)
+    * sparse_categorical_crossentropy(y_true, y_pred, from_logits=True)
+* Autoencoder: unsupervised learing -> dimension and noise reduction
+    * input and output layers have same dimension (count of neurons) (not like a typical MSP (multilayer perceptron))
+    * hidden layers reduce dimension (to lower count of neurons) and reproduce an output with same dimension as input layer
+    * hidden layers combine several features
+    * similar to PCA (Principal Component Analysis)
+    * use cases:
+        * dimension (feature) reduction (e.g. create an encoder with less dims, and a fitting decoder)
+        * noise reduction
+        * pack information
+        * visualize data in lower dimensions
+    * SGD (stochastic gradient descent)
+    * example:
+        * encoder = new Sequential(Dense(units=2, activation='relu', input_shape=[3]))
+        * decoder = new Sequential(Dense(units=3, activation='relu', input_shape=[2]))
+        * autoencoder = Sequential(([encoder, decoder]))
+        * autoencoder.compile(loss='mse', optimizer=SDG(lr=1.5))
+        * scaler = MinMaxScaler()
+        * scaled_data = scaler.fit_transform(feat)
+        * model.fit(scaled_data, scaled_data, epochs=5)
+        * encoded_2dim = encoder.predict(scaled_data)
+* GAN (Generative Adversarial Networks)
+    * generator : creates noisy images and learns to generate images that are classified by the discriminator as original
+    * discriminator: gets original images and tries to distinguish between original and generated -> binary classification
+    * -> useful for picture and video manipulation
+    * DCGAN: Deep Convolutional GAN
+* Reinforcement Learning: Environment(OpenAI) -> Agent(Action) -> Feedback/Observation -> Reward/Optimize
+    * provides secure artificial intelligence -> openai-gym toolkit
+    * policy gradients: observation of historical actions - not only the last actions
+        * discount rate: R(t0) + R(t1)*D + R(t2)*D²+R(t3)*D³+...: with R:reward, D:Discount (mostly 0.95-0.99)
