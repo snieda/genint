@@ -45,15 +45,18 @@ rules:
         binary: binary_crossentropy
         categorical: categorical_crossentropy
 
+predict-preprocess: True         # whether to use same preprocessing (see above) as on training/testing on predict-files
+predict-layer: None              # on prediction, a sub-model can be extracted (see AED: encoder or decoder)
+
 ########################################
 # example for regression ANN
 ########################################
-# data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/04-ANNs/
+data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/04-ANNs/
 
 ########################################
 # example for binary ANN
 ########################################
-# data-dir: 05-CNNs/
+# data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/05-CNNs/
 # data-file: lending_club_loan_two.csv
 # drop-columns: ['emp_title']
 # y-column: 'loan_status'
@@ -62,9 +65,9 @@ rules:
 ########################################
 # example for CNN with images
 ########################################
-# data-dir: 05-CNNs/DATA
-# train-dir: train
-# test-dir: test
+data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/05-CNNs/DATA
+train-dir: train
+test-dir: test
 
 ########################################
 # example for RNN sequence
@@ -77,9 +80,10 @@ rules:
 ########################################
 # example for AED en-/decoding
 ########################################
-data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/DATA/
-data-file: UK_foods.csv
-network-type: AED
+# data-dir: schulung/fortbildung-deep-learning-keras-tensorflow2/DATA/
+# data-file: UK_foods.csv
+# network-type: AED
+# predict-layer: encoder
 
 RIF: # Reinforced (=DQN)
     loss: mse

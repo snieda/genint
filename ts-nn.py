@@ -21,6 +21,25 @@ info="""
 #
 # For further informations, see: ts-nn.yml
 #
+#-----------------------------------------------------------------------------
+# usage:
+#    <model | --help> [predict[props]]
+#    
+#    with:
+#        model  : model file name without extension
+#        predict: tuple or list to predict or
+#                    starting with 'file:' loading csv file to predict or
+#                    starting with 'image:' loading image file to predict
+#        props  : property dictionary to override the loaded yml-properties
+#        --help : print this info
+#
+#    examples:
+#        ts-nn.py my-model [1, 2, 3] {"verbose": 0}
+#        ts-nn.py my-model (1, 2, 3)
+#        ts-nn.py my-model image: my-image.png
+#        ts-nn.py my-model file: my-predict.csv {"verbose": 0}
+#-----------------------------------------------------------------------------
+#
 # NOTE: Another solution would be to optimize the hyper paramerers through evolutional
 #       algorithms like in tsl2.nano.gp.
 # NOTE: as some functions use eval(), run this script only in a trusted content!
@@ -79,24 +98,7 @@ def main():
     _print(p, 2)
     _print('='*80)
     if (len(sys.argv) == 2 and sys.argv[1] == '--help'):
-        usage = """
-        <model | --help> [predict[props]]
-        
-        with:
-            model  : model file name without extension
-            predict: tuple or list to predict or
-                     starting with 'file:' loading csv file to predict or
-                     starting with 'image:' loading image file to predict
-            props  : property dictionary to override the loaded yml-properties
-            --help : print this info
-
-        examples:
-            ts-nn.py my-model [1, 2, 3] {"verbose": 0}
-            ts-nn.py my-model (1, 2, 3)
-            ts-nn.py my-model image: my-image.png
-            ts-nn.py my-model file: my-predict.csv {"verbose": 0}
-        """
-        print('usage: ' + sys.argv[0] + usage + info)
+        print(info)
     else:
         model = create_network(sys.argv[1] if len(sys.argv) > 1 else model_name)
         if (len(sys.argv) > 2):
@@ -237,12 +239,13 @@ def create_learn_model(nn: str, input_shape, train_xy, test_xy, expection_type) 
 # TODO: best part to be encapsulated into subclasses
 def get_layers(type: str, input_shape: tuple) -> list:
     if (type == 'ANN'):
+        units = get_randunits(input_shape)
         return [
-            Dense(get_randunits(input_shape)),
+            Dense(units),
             Dropout(p['dropout']),
-            Dense(get_randunits(input_shape)),
+            Dense(units // 2),
             Dropout(p['dropout']),
-            Dense(get_randunits(input_shape)),
+            Dense(units // 4),
             Dropout(p['dropout']),
             Activation(p[type]['activation']),
             Dense(1, activation='sigmoid')]
@@ -264,7 +267,7 @@ def get_layers(type: str, input_shape: tuple) -> list:
     elif (type == 'GAN'):
         raise BaseException(type + ' not implemented yet')
     elif (type == 'AED'):
-        encoder = Sequential()
+        encoder = Sequential(name='encoder')
         minu = p['AED']['min-units']
         u = input_shape[0]
         it = [u]
@@ -272,7 +275,7 @@ def get_layers(type: str, input_shape: tuple) -> list:
             u = u // 2
             it.append(u)
             encoder.add(Dense(u))
-        decoder = Sequential()
+        decoder = Sequential(name='decoder')
         for u in reversed(it):
             encoder.add(Dense(u))
         return [encoder, decoder] 
@@ -297,8 +300,13 @@ def predict_args(model: Sequential, arg: str) -> np.array:
     _print(prediction)
 
 def predict(model: Sequential, to_predict: np.array) -> np.array:
-    scaler = pickle.load(open(f'{name}-scaler.dump', 'rb'))
-    scaler.transform(to_predict)
+    if (p['predict-layer'] is not None and p['predict-layer'] != 'None'):
+        model = model.get_layer(p['predict-layer'])
+    if (p['predict-preprocess']):
+        to_predict = preprocess_textual_data(to_predict)
+    else:
+        scaler = pickle.load(open(f'{name}-scaler.dump', 'rb'))
+        scaler.transform(to_predict)
     return model.predict(to_predict)
 
 def rule(name: str):
@@ -388,7 +396,8 @@ def load_textual_data(train_path, test_path, classifications):
             sns.heatmap(df.corr(),annot=True,cmap='viridis')
             plt.ylim(10, 0)
 
-        X_train, y_train, X_test, y_test = preprocess_textual_data(df)
+        df = preprocess_textual_data(df)
+        X_train, y_train, X_test, y_test = split_scale_xy(df)
         if (get_model_type((X_train, y_train)) == 'RNN' and isinstance(y_train[0], date)):
             return generate_time_series(X_train, y_train, X_test, y_test)
         else:
@@ -426,7 +435,9 @@ def preprocess_textual_data(df: pd.DataFrame):
 
     _print('remaining shape after pre-processing: ' + str(df.shape))
     _print('columns: ' + str(df.columns))
+    return df
 
+def split_scale_xy(df: pd.DataFrame()):
     # extract X data and one y column
     y = df.iloc[:, p['y-column']] if isinstance(p['y-column'], int) else df[p['y-column']]
     # if (isinstance(y[0], date)): # the timeseriesgenerator needs y column in the data set
@@ -446,7 +457,7 @@ def preprocess_textual_data(df: pd.DataFrame):
     return X_train, y_train, X_test, y_test
 
 def generate_time_series(X_train, y_train, X_test, y_test):
-    # TODO: not working yet - on fit() there is a problem
+    # TODO: not working yet - on fit() there is a problem with the input shape
     train_xy = np.insert(X_train, 0, y_train, axis=1)
     test_xy = np.insert(X_test, 0, y_test, axis=1)
     l = length=len(y_test) // 2
@@ -547,7 +558,7 @@ def get_data_type(data) -> str:
     return 'binary' if is_binary_data() else 'text'
 
 def get_model_type(data) -> str:
-    if (p['network-type'] is not None):
+    if (p['network-type'] is not None and p['network-type'] != 'None'):
         return p['network-type']
 
     type = get_data_type(data)
@@ -565,7 +576,7 @@ def get_randunits(input_shape: tuple) -> int:
 def save(model, str_iteration: str=''):
     file = name + str_iteration + '.' + p['save-format']
     _print(f'saving model to : {file}')
-    model.save(file, save_format=p['save-format'])
+    model.save(file, save_format=p['save-format'], overwrite=True)
 
 def load(name) -> Sequential:
     f = name + '.' + p['save-format']
