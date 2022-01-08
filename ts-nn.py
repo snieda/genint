@@ -1,4 +1,5 @@
 #!/usr/bin/python
+info="""
 ##############################################################################
 # TS-NN: Neural Network on base of Keras providing a generic interface to create
 # one of:
@@ -22,9 +23,11 @@
 #
 # NOTE: Another solution would be to optimize the hyper paramerers through evolutional
 #       algorithms like in tsl2.nano.gp.
+# NOTE: as some functions use eval(), run this script only in a trusted content!
 #
 # CURRENT STATE: minimized implementation for ANN, CNN
 # TODO: encapsulate implementations per NN type
+# TODO: have a look at https://keras.io/api/keras_tuner/
 #
 # cp Thomas Schneider / Jan-2022
 #
@@ -37,8 +40,10 @@
 # https://awjuliani.medium.com/super-simple-reinforcement-learning-tutorial-part-2-ded33892c724
 # https://gitlab.com/snieda/tsl2nano/-/tree/master/tsl2.nano.gp
 ##############################################################################
+"""
 
 import os, sys, yaml, joblib, json
+import pickle #import dump, load
 from random import randint
 from datetime import date
 import pandas as pd
@@ -52,10 +57,11 @@ from tensorflow.keras.layers import Activation, Dropout, Flatten, Dense, Conv2D,
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
+from tensorflow.keras.utils import text_dataset_from_directory
 from sklearn.metrics import classification_report,confusion_matrix
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.preprocessing.sequence import TimeseriesGenerator
 
 name: str = ''
 p = {} # load properties from ts-nn.yml
@@ -73,13 +79,32 @@ def main():
     _print(p, 2)
     _print('='*80)
     if (len(sys.argv) == 2 and sys.argv[1] == '--help'):
-        print('usage: ' + sys.argv[0] + " <model file name without extension> [[tuple to predict]|[property dict]]")
+        usage = """
+        <model | --help> [predict[props]]
+        
+        with:
+            model  : model file name without extension
+            predict: tuple or list to predict or
+                     starting with 'file:' loading csv file to predict or
+                     starting with 'image:' loading image file to predict
+            props  : property dictionary to override the loaded yml-properties
+            --help : print this info
+
+        examples:
+            ts-nn.py my-model [1, 2, 3] {"verbose": 0}
+            ts-nn.py my-model (1, 2, 3)
+            ts-nn.py my-model image: my-image.png
+            ts-nn.py my-model file: my-predict.csv {"verbose": 0}
+        """
+        print('usage: ' + sys.argv[0] + usage + info)
     else:
         model = create_network(sys.argv[1] if len(sys.argv) > 1 else model_name)
         if (len(sys.argv) > 2):
+            if (len(sys.argv) > 3 and sys.argv[3].startswith('{')):
+                p.update(json.loads(sys.argv[3]))
             predict_args(model, sys.argv[2])
-        elif (arg2.startswith('{')):
-            p.update(json.loads(arg2))
+        else:
+            print('NO PREDICTION DATA GIVEN -> DOING NOTHING!')
 
 def load_properties(name) -> dict:
     with open(name + '.yml', 'r') as stream:
@@ -92,9 +117,8 @@ def create_network(model_name) -> Sequential:
     _print("creating or loading model: " + name)
     model=load(name)
     if (model == None):
-        input_shape, classifications, train_data, test_data, expection_type = arrange_data(name)
+        input_shape, classifications, train_data, test_data, expection_type = arrange_data()
         model = create_optimize_model(input_shape, classifications, train_data, test_data, expection_type)
-        model = predict(model, predict)
         save(model)
     else:
         _print(model.summary(), 1)
@@ -194,7 +218,7 @@ def create_learn_model(nn: str, input_shape, train_xy, test_xy, expection_type) 
         _print('adding layer: ' + str(l))
         model.add(l)
     model.build(input_shape)
-    model.compile(loss=p['loss'][expection_type], optimizer=p[nn]['optimizer'], metrics=p[nn]['metrics'])
+    model.compile(loss=rule('loss')[expection_type], optimizer=p[nn]['optimizer'], metrics=p[nn]['metrics'])
     _print(model.summary())
 
     if (train_xy is not None and test_xy is not None):
@@ -263,15 +287,22 @@ def get_layers(type: str, input_shape: tuple) -> list:
 
 def predict_args(model: Sequential, arg: str) -> np.array:
     X = None
-    if (arg.startswith('(')):
-        X = arg
+    if (arg.startswith('(') or arg.startswith('[')):
+        X = eval(arg)
+    elif arg.startswith('image:'):
+        X = imread(arg[6:])
     elif arg.startswith('file:'):
-        X = imread(arg[5:])
+        X = pd.read_csv(arg[5:])
     predict(model, X)
     _print(prediction)
 
 def predict(model: Sequential, to_predict: np.array) -> np.array:
+    scaler = pickle.load(open(f'{name}-scaler.dump', 'rb'))
+    scaler.transform(to_predict)
     return model.predict(to_predict)
+
+def rule(name: str):
+    return p['rules'][name]
 
 def print_data_info(train_path, classifications):
     _print('-' * 80)
@@ -294,8 +325,8 @@ def print_model_info(model: Sequential, test_xy: tuple, expection_type: str):
     _print(classification_report(y, predictions))
     _print(confusion_matrix(y, predictions))
 
-""" TODO: only implemented for ANN, CNN """
-def arrange_data(name):
+""" load, classify and preprocess data """
+def arrange_data():
     train_path = os.path.join(p['data-dir'], p['train-dir'])
     test_path = os.path.join(p['data-dir'], p['test-dir'])
     classifications = get_classifications(train_path)
@@ -363,8 +394,11 @@ def load_textual_data(train_path, test_path, classifications):
         else:
             return (X_train, y_train), (X_test, y_test), X_train.shape
     else:
-        #return df, df, None # TODO: return load_textual_classified(train_path, test_path, classifications)
-        raise BaseException('folder classified textual data is not implemented yet!')
+        # ON CONSTRUCTION - NOT TESTED YET. TODO: preprocess data, evaluate input_shape
+        train_set = text_dataset_from_directory(train_path)
+        test_set = text_dataset_from_directory(test_path)
+        return train_set, test_set, None
+        # raise BaseException('folder classified textual data is not implemented yet!')
 
 def preprocess_textual_data(df: pd.DataFrame):
     if (df.shape[1] > df.shape[0]):
@@ -407,6 +441,7 @@ def preprocess_textual_data(df: pd.DataFrame):
     scaler = MinMaxScaler()
     scaler.fit_transform(X_train)
     scaler.transform(X_test)
+    pickle.dump(scaler, open(f'{name}-scaler.dump', 'wb'))
 
     return X_train, y_train, X_test, y_test
 
@@ -508,6 +543,9 @@ def is_binary_data(train_path: str = None, classifications: list = None) -> bool
         _print('loading data as binary!')
     return binary_data
 
+def get_data_type(data) -> str:
+    return 'binary' if is_binary_data() else 'text'
+
 def get_model_type(data) -> str:
     if (p['network-type'] is not None):
         return p['network-type']
@@ -521,18 +559,18 @@ def get_model_type(data) -> str:
         return "ANN"
     # GAN and AED must be defined by 'network-type'!
 
-def get_data_type(data) -> str:
-    return 'binary' if is_binary_data() else 'text'
-
 def get_randunits(input_shape: tuple) -> int:
     return min(p['max-units'], randint(input_shape[0], input_shape[0] * input_shape[1]))
 
 def save(model, str_iteration: str=''):
-    model.save(name + str_iteration + '.h5')
+    file = name + str_iteration + '.' + p['save-format']
+    _print(f'saving model to : {file}')
+    model.save(file, save_format=p['save-format'])
 
 def load(name) -> Sequential:
-    f = name + '.h5'
-    if (os.path.exists(name)):
+    f = name + '.' + p['save-format']
+    if (os.path.exists(f)):
+        _print(f'loading model from {f}')
         return load_model(f)
     else:
         return None

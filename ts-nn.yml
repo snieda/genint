@@ -9,6 +9,7 @@
 #   metrics     : mae, accuracy
 #   loss        : mse, binary_crossentropy
 ##############################################################################
+#sys.argv += 'ts-nn file:schulung/fortbildung-deep-learning-keras-tensorflow2/DATA/UK_foods.csv {"verbose":0}'.split()
 
 # name: test                     # model file name to load (without extension (must be '.h5'))
 #type: csv                       # type of train/test data (csv, binary, sequence)
@@ -29,13 +30,20 @@ verbose: 1                       # logging output
 
 train-dir: ''                    # to define classifications through folder names (e.g. used by CNN image loading)
 test-dir: ''                     # to define classifications through folder names (e.g. used by CNN image loading)
+save-format: h5                  # tf: new tensorflow SaveModel, h5: old keras save type
 
 max-units: 100                   # maximum count of neurons per layer
 batch-size: 16                   # batch_size on learn process (fit)
 epochs: 20                       # epochs to redo the network learning (fit)
 dropout: 0.1                     # on Dropout layers use this dropout value
 max-categories: 20               # maximum count of y values to cagegorize - otherwise use regression
-loss: {regression: mse, binary: binary_crossentropy, categorical: categorical_crossentropy}
+
+# rule table
+rules:
+    loss: 
+        regression: mse
+        binary: binary_crossentropy
+        categorical: categorical_crossentropy
 
 ########################################
 # example for regression ANN
@@ -109,9 +117,9 @@ AED: # AutoEncoder
     activation: relu
     optimizer: sgd
     metrics: [accuracy]
-    min-units: 2 # dense layers with len(data) // 2 will be created in a loop
+    min-units: 2 # dense layers with [len(data) // 2] will be created in a loop
 
-hyper-pars: # used for model optimizing, if hyper=True
+hyper-pars: # used for model optimizing, if hyper=reinforce
     units: [0, 100, 2]
     loss: [mse, binary_crossentropy]
     activation: [linear, relu, softmax, sigmoid]
